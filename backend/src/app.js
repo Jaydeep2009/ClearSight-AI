@@ -3,7 +3,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
-
+import uploadRoutes from "./routes/uploadRoutes.js"; 
 dotenv.config();
 const app= express();
 
@@ -21,6 +21,9 @@ app.get("api/health",(req,res)=>{
 
 //Auth routes
 app.use("/api/auth", authRoutes);
+
+//File upload routes
+app.use("/api/upload", uploadRoutes);
 
 //MongoDB connection
 

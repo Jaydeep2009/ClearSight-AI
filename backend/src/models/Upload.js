@@ -1,12 +1,11 @@
 import mongoose from "mongoose";
 
 const uploadSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true},
   fileName: { type: String, required: true },
-  fileType: { type: String, required: true },  
-  rawData: { type: Buffer },                   
-  rawParsed: { type: Array, default: [] },     // messy first parse
-  parsedData: { type: Array, default: [] },    // cleaned JSON
+  fileType: { type: String, required: true },                    
+  //rawParsed: { type: mongoose.Schema.Types.Mixed, default: [] }, // allows array or text
+  parsedData: { type: mongoose.Schema.Types.Mixed, default: [] }, // cleaned, flexible
   uploadedAt: { type: Date, default: Date.now }
 });
 
