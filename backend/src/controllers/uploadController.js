@@ -2,42 +2,8 @@ import Upload from "../models/Upload.js";
 import { parseExcel } from "../utils/parseExcel.js";
 import { parsePDF } from "../utils/parsePDF.js";
 import { parseLogs } from "../utils/parseLogs.js";
+import { computeStats } from "../utils/dataStats.js"; // ✅ stats utility
 import path from "path";
-import axios from "axios"; // for calling DeepSeek API
-
-// Utility: Call DeepSeek API for insights
-const generateInsights = async (parsedData) => {
-  try {
-    const response = await axios.post(
-      "https://api.deepseek.com/v1/chat/completions",
-      {
-        model: "deepseek-chat",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a data analysis assistant. Summarize key insights, patterns, and trends from structured data in plain English.",
-          },
-          {
-            role: "user",
-            content: `Here is the parsed data: ${JSON.stringify(parsedData).slice(0, 5000)}`, 
-          },
-        ],
-      },
-      {
-        headers: {
-          "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    return response.data.choices[0]?.message?.content || "No insights generated";
-  } catch (err) {
-    console.error("DeepSeek API error:", err.response?.data || err.message);
-    return "AI Insights unavailable";
-  }
-};
 
 export const handleFileUpload = async (req, res) => {
   try {
@@ -46,7 +12,6 @@ export const handleFileUpload = async (req, res) => {
     }
 
     const userId = req.body.userId || (req.user ? req.user._id : null);
-
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized: userId missing" });
     }
@@ -57,27 +22,27 @@ export const handleFileUpload = async (req, res) => {
       const ext = path.extname(file.originalname).toLowerCase();
       let parsedData = null;
 
-      // Step 1: Parse file
-      if (ext === ".xlsx" || ext === ".xls" || ext === ".csv") {
+      // Step 1: Parse
+      if ([".xlsx", ".xls", ".csv"].includes(ext)) {
         ({ parsedData } = await parseExcel(file.buffer));
       } else if (ext === ".pdf") {
         ({ parsedData } = await parsePDF(file.buffer));
-      } else if (ext === ".log" || ext === ".txt") {
+      } else if ([".log", ".txt"].includes(ext)) {
         ({ parsedData } = await parseLogs(file.buffer));
       } else {
         return res.status(400).json({ error: `Unsupported file type: ${ext}` });
       }
 
-      // Step 2: Generate AI insights
-      const insights = await generateInsights(parsedData);
+      // Step 2: Compute stats
+      const stats = computeStats(parsedData);
 
-      // Step 3: Save into MongoDB
+      // Step 3: Save to DB
       const uploadDoc = new Upload({
         userId,
         fileName: file.originalname,
         fileType: file.mimetype,
         parsedData,
-        insights, // NEW
+        stats,   // ✅ save stats only
       });
 
       await uploadDoc.save();
@@ -85,11 +50,13 @@ export const handleFileUpload = async (req, res) => {
     }
 
     res.status(200).json({
-      message: "Files uploaded, parsed, analyzed, and stored successfully!",
+      message: "Files uploaded, parsed, and stored successfully!",
       uploads: results,
     });
   } catch (err) {
-    console.error("Upload error:", err);
-    res.status(500).json({ error: "File processing failed" });
+      console.error("❌ Upload error:", err.message);
+      console.error(err.stack);
+      res.status(500).json({ error: err.message }); // return real error
   }
+
 };

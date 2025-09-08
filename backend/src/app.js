@@ -20,8 +20,8 @@ app.get("/api/health", (req, res) => {
 
 // Routes
 app.use("/api/auth", authRoutes);
-app.use("/api", uploadRoutes);           // upload → /api/upload
 app.use("/api/dashboard", dashboardRoutes); // dashboards
+app.use("/api/upload", uploadRoutes); 
 
 // MongoDB connection + Start server
 mongoose
