@@ -2,7 +2,8 @@ import Upload from "../models/Upload.js";
 import { parseExcel } from "../utils/parseExcel.js";
 import { parsePDF } from "../utils/parsePDF.js";
 import { parseLogs } from "../utils/parseLogs.js";
-import { computeStats } from "../utils/dataStats.js"; // ✅ stats utility
+import { computeStats } from "../utils/dataStats.js";
+import { generateInsights } from "../services/aiService.js"; // ✅ AI service
 import path from "path";
 
 export const handleFileUpload = async (req, res) => {
@@ -11,7 +12,7 @@ export const handleFileUpload = async (req, res) => {
       return res.status(400).json({ error: "No files uploaded" });
     }
 
-    const userId = req.body.userId || (req.user ? req.user._id : null);
+    const userId = req.user ? req.user.id : null; // ✅ use from JWT
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized: userId missing" });
     }
@@ -36,13 +37,18 @@ export const handleFileUpload = async (req, res) => {
       // Step 2: Compute stats
       const stats = computeStats(parsedData);
 
-      // Step 3: Save to DB
+      // Step 3: AI Insights (role-aware)
+      const aiResult = await generateInsights(parsedData, req.user.role);
+
+      // Step 4: Save to DB
       const uploadDoc = new Upload({
         userId,
         fileName: file.originalname,
         fileType: file.mimetype,
         parsedData,
-        stats,   // ✅ save stats only
+        stats,
+        insights: aiResult.summary, // ✅ main summary
+        aiMeta: aiResult,          // ✅ full structured response
       });
 
       await uploadDoc.save();
@@ -50,13 +56,12 @@ export const handleFileUpload = async (req, res) => {
     }
 
     res.status(200).json({
-      message: "Files uploaded, parsed, and stored successfully!",
+      message: "Files uploaded, parsed, analyzed, and stored successfully ✅",
       uploads: results,
     });
   } catch (err) {
-      console.error("❌ Upload error:", err.message);
-      console.error(err.stack);
-      res.status(500).json({ error: err.message }); // return real error
+    console.error("❌ Upload error:", err.message);
+    console.error(err.stack);
+    res.status(500).json({ error: err.message });
   }
-
 };

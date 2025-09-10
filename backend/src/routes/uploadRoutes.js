@@ -2,6 +2,8 @@ import express from "express";
 import { handleFileUpload } from "../controllers/uploadController.js";
 import { upload } from "../middleware/upload.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { refreshInsights } from "../controllers/refreshInsights.js";
+import { refreshAllInsights } from "../controllers/refreshAllInsights.js";
 import Upload from "../models/Upload.js";
 
 const router = express.Router();
@@ -17,6 +19,9 @@ router.post(
   handleFileUpload
 );
 
+//regenerates insights
+router.post("/:id/refresh-insights", refreshInsights);
+router.post("/refresh-all", refreshAllInsights);  // ✅ batch refresh
 /**
  * Employee Dashboard → see only their own uploads
  */
