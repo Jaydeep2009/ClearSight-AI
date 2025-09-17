@@ -4,36 +4,43 @@ import bcrypt from "bcryptjs";
 
 //signup
 
-export async function signup(req, res){
-    try{
-        const {name,email,password,role}=req.body;
+export async function signup(req, res) {
+    try {
+        // 1️⃣ Destructure first
+        const { name, email, password, role } = req.body;
 
-        //check user existence
+        // 2️⃣ Validate input
+        if (!name || !email || !password || !role) {
+            return res.status(400).json({ msg: "All fields are required" });
+        }
 
-        const existingUser= await User.findOne({email});
-        if(existingUser) return res.status(400).json({msg:"Email already registered"});
+        // 3️⃣ Check user existence
+        const existingUser = await User.findOne({ email });
+        if (existingUser) return res.status(400).json({ msg: "Email already registered" });
 
-        //hash password
-        const passwordHash=await bcrypt.hash(password,10);
+        // 4️⃣ Hash password
+        const passwordHash = await bcrypt.hash(password, 10);
 
-        //create user
+        // 5️⃣ Create user
+        const user = await User.create({ name, email, passwordHash, role });
 
-        const user= await User.create({name,email,passwordHash,role});
-
-        //generate jwt token
-
+        // 6️⃣ Generate JWT token
         const token = jwt.sign(
-            {id:user._id,role:user.role},
+            { id: user._id, role: user.role },
             process.env.JWT_SECRET,
-            {expiresIn:"2d"}
+            { expiresIn: "2d" }
         );
-        
-        res.json({token, user:{id:user._id, name:user.name, email: user.email, role:user.role}});
-    }catch(err){
+
+        res.json({
+            token,
+            user: { id: user._id, name: user.name, email: user.email, role: user.role }
+        });
+    } catch (err) {
         console.error(err);
-        res.status(500).json({msg:"Server error"})
+        res.status(500).json({ msg: "Server error" });
     }
-}
+};
+
 
 
 //login
