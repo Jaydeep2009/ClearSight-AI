@@ -38,6 +38,7 @@ router.get(
  * Manager Dashboard → Team-level uploads
  * (Assumes User schema has teamId)
  */
+// Manager Dashboard → Team-level uploads
 router.get(
   "/manager",
   authMiddleware,
@@ -45,14 +46,21 @@ router.get(
   async (req, res) => {
     try {
       const { start, end } = req.query;
-      const filter = { teamId: req.user.teamId };
+
+      // Find users in the manager's team
+      const teamUsers = await User.find({ teamId: req.user.teamId }).select("_id");
+
+      const teamUserIds = teamUsers.map((u) => u._id);
+
+      // Filter uploads only for team members
+      const filter = { userId: { $in: teamUserIds } };
 
       if (start && end) {
         filter.createdAt = { $gte: new Date(start), $lte: new Date(end) };
       }
 
       const uploads = await Upload.find(filter)
-        .populate("userId", "name role email")
+        .populate("userId", "name role email teamId")
         .sort({ createdAt: -1 });
 
       res.json({ success: true, data: uploads });
@@ -62,6 +70,7 @@ router.get(
     }
   }
 );
+
 
 /**
  * Admin Dashboard → See everything
