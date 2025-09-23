@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import insightsRouter from "./routes/insights.js";
+
 
 dotenv.config();
 const app = express();
@@ -22,6 +24,8 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/insights", insightsRouter);
+
 
 // Connect to MongoDB and start server
 const PORT = process.env.PORT || 5000;
