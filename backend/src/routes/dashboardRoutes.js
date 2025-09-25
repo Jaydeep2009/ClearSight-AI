@@ -1,6 +1,7 @@
 // routes/dashboardRoutes.js
 import express from "express";
 import Upload from "../models/Upload.js";
+import User from "../models/User.js"; 
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
