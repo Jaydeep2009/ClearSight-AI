@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import InsightsPanel from "./InsightsPanel";
+import Upload from "../components/Upload";
 
 function Dashboard({ role }) {
   const [uploads, setUploads] = useState([]);
@@ -21,9 +23,12 @@ function Dashboard({ role }) {
     const query = start && end ? `?start=${start}&end=${end}` : "";
 
     try {
-      const res = await fetch(`http://localhost:5000/api/dashboard${endpoint}${query}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `http://localhost:5000/api/dashboard${endpoint}${query}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       const data = await res.json();
       if (data.success) setUploads(data.data);
       else setError(data.error || "Failed to fetch dashboard");
@@ -41,6 +46,7 @@ function Dashboard({ role }) {
     <div style={{ padding: "20px" }}>
       <h2>{(role || "").toUpperCase()} Dashboard</h2>
 
+      {/* Manager filters + insights */}
       {role === "manager" && (
         <div style={{ marginBottom: "20px" }}>
           <input
@@ -54,9 +60,21 @@ function Dashboard({ role }) {
             onChange={(e) => setEndDate(e.target.value)}
           />
           <button onClick={() => fetchData(startDate, endDate)}>Filter</button>
+
+          <div className="min-h-screen bg-gray-50 p-6">
+            <h1 className="text-2xl font-bold mb-6">📈 Manager Dashboard</h1>
+            <InsightsPanel />
+          </div>
         </div>
       )}
 
+      {/* Upload option (for employees/managers/admins) */}
+      <div style={{ marginTop: "20px" }}>
+        <h3>Upload a File</h3>
+        <Upload />
+      </div>
+
+      {/* Uploaded files list */}
       {uploads.length === 0 ? (
         <p>No uploads found.</p>
       ) : (
@@ -69,6 +87,8 @@ function Dashboard({ role }) {
           ))}
         </ul>
       )}
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
     </div>
   );
 }
