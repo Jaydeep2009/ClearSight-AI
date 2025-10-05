@@ -11,7 +11,9 @@ export const refreshInsights = async (req, res) => {
       return res.status(404).json({ error: "Upload not found" });
     }
 
-    // regenerate insights from stored parsedData
+// regenerate insights from stored parsedData
+
+    
     const insights = await generateInsights(upload.parsedData, role);
 
     upload.insights = insights;

@@ -1,97 +1,132 @@
+// services/aiService.js
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 dotenv.config();
 
 /**
- * Generate AI insights from parsed data
- * @param {Object|Array} data - The parsed/cleaned data
+ * Generate AI insights from a local uploaded file using Gemini
+ * Supports PDF, CSV, TXT, etc.
+ * @param {String} filePath - Path to uploaded file
  * @param {String} role - User role ("employee", "manager", "admin")
- * @returns {Object} { summary, raw }
+ * @returns {Object} Insights { summary, keyFindings, anomalies, recommendations, raw }
  */
-export async function generateInsights(data, role = "employee") {
-  const provider = process.env.AI_PROVIDER || "dummy"; 
-  const prompt = `
-You are an AI assistant for ClearSight AI.
-Summarize the following structured data for a ${role}.
-Highlight key trends, anomalies, and actionable insights.
-Return JSON with:
-{
-  "summary": "plain-English overview",
-  "keyFindings": ["point1", "point2"],
-  "anomalies": ["odd pattern"],
-  "recommendations": ["action1", "action2"]
-}
-
-Data:
-${JSON.stringify(data).slice(0, 3000)} 
-`;
-
+export async function generateInsights(filePath, role = "employee") {
   try {
-    if (provider === "openai") {
-      const OpenAI = await import("openai");
-      const client = new OpenAI.default({ apiKey: process.env.OPENAI_API_KEY });
-
-      const response = await client.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-      });
-
-      const raw = response.choices[0].message.content;
-      return safeParse(raw);
+    // 🧩 1. Verify file exists
+    if (!fs.existsSync(filePath)) {
+      throw new Error("File not found at path: " + filePath);
     }
 
-    if (provider === "gemini") {
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    // 🧩 2. Read file and encode as Base64
+    const fileBuffer = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
 
-      const response = await model.generateContent(prompt);
-      const raw = response.response.text();
-      return safeParse(raw);
-    }
-
-    if (provider === "deepseek") {
-      const resp = await fetch("https://api.deepseek.com/v1/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ model: "deepseek-chat", prompt }),
-      });
-
-      const dataResp = await resp.json();
-      const raw = dataResp.choices?.[0]?.text || "No insights";
-      return safeParse(raw);
-    }
-
-    // Dummy fallback
-    return {
-      summary: `📊 Dummy Insights: Found ${Array.isArray(data) ? data.length : Object.keys(data).length} records.`,
-      keyFindings: [],
-      anomalies: [],
-      recommendations: [],
-      raw: "dummy",
+    // Detect MIME type
+    const mimeTypes = {
+      ".pdf": "application/pdf",
+      ".csv": "text/csv",
+      ".txt": "text/plain",
+      ".json": "application/json",
     };
 
+    const mimeType = mimeTypes[ext] || "application/octet-stream";
+
+    // 🧩 3. Initialize Gemini client
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    // 🧩 4. Prepare prompt
+    const prompt = `
+You are an AI assistant for ClearSight AI.
+Analyze this uploaded file and extract:
+1. A short summary
+2. Key findings or patterns
+3. Any anomalies or concerns
+4. Actionable recommendations
+
+Return JSON with:
+{
+  "summary": "...",
+  "keyFindings": ["..."],
+  "anomalies": ["..."],
+  "recommendations": ["..."]
+}
+`;
+
+    // 🧩 5. Send file + prompt to Gemini
+    const response = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          data: fileBuffer.toString("base64"),
+          mimeType,
+        },
+      },
+    ]);
+
+    const raw = response?.response?.text?.() || "No response from Gemini.";
+    return safeParse(raw);
   } catch (err) {
-    console.error("AI Service Error:", err);
+    console.error("❌ Gemini AI Error:", err.message || err);
     return {
       summary: "⚠️ AI insight generation failed.",
       keyFindings: [],
       anomalies: [],
       recommendations: [],
-      raw: err.message,
+      raw: err.message || "Unknown error",
     };
   }
 }
 
 /**
- * Try to parse JSON safely
+ * Safe JSON parsing helper
  */
 function safeParse(raw) {
   try {
-    return { ...JSON.parse(raw), raw };
-  } catch {
-    return { summary: raw, keyFindings: [], anomalies: [], recommendations: [], raw };
+    // 🧹 Clean markdown formatting
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+
+    // Try normal JSON parse first
+    const parsed = JSON.parse(cleaned);
+    if (parsed.summary && parsed.keyFindings) return { ...parsed, raw };
+
+    // If summary itself contains nested JSON, extract and parse that
+    if (typeof parsed.summary === "string" && parsed.summary.includes("{")) {
+      const innerMatch = parsed.summary.match(/{[\s\S]*}/);
+      if (innerMatch) {
+        const innerParsed = JSON.parse(innerMatch[0]);
+        return { ...innerParsed, raw };
+      }
+    }
+
+    // If not JSON but still text, wrap it safely
+    return {
+      summary: cleaned,
+      keyFindings: [],
+      anomalies: [],
+      recommendations: [],
+      raw,
+    };
+  } catch (err) {
+    // Final fallback for non-JSON responses
+    const match = raw.match(/{[\s\S]*}/);
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[0]);
+        return { ...parsed, raw };
+      } catch {}
+    }
+
+    return {
+      summary: raw.replace(/```json|```/g, "").trim(),
+      keyFindings: [],
+      anomalies: [],
+      recommendations: [],
+      raw,
+    };
   }
 }
+

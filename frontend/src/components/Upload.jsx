@@ -1,44 +1,85 @@
 import React, { useState } from "react";
-import axios from "axios";
 
-export default function Upload() {
-  const [file, setFile] = useState(null);
+const Upload = ({ onUploadSuccess }) => {
+  const [files, setFiles] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState(null);
+
+  const handleFileChange = (e) => {
+    setFiles(e.target.files);
+    setError(null);
+  };
 
   const handleUpload = async () => {
-    if (!file) return setMessage("⚠️ Please select a file");
-    setLoading(true);
-    setMessage("");
+    if (!files || files.length === 0) {
+      return alert("⚠️ Please select files first!");
+    }
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append("files", files[i]);
+    }
 
     try {
-      const token = localStorage.getItem("token");
-      const formData = new FormData();
-      formData.append("files", file); // 'files' because backend expects array
+      setLoading(true);
+      setError(null);
 
-      const res = await axios.post("http://localhost:5000/api/upload", formData, {
+      const res = await fetch("http://localhost:5000/api/upload", {
+        method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        body: formData,
       });
 
-      setMessage("✅ Upload successful!");
-    } catch (err) {
-      console.error(err);
-      setMessage("❌ Upload failed");
-    } finally {
+      const data = await res.json();
       setLoading(false);
+
+      if (!res.ok) {
+        console.error("❌ Upload failed:", data.error);
+        setError(data.error || "Upload failed.");
+        alert(`❌ Upload failed: ${data.error || "Unknown error"}`);
+        return;
+      }
+
+      // ✅ Successful upload
+      console.log("✅ Upload success:", data);
+      alert("✅ Upload successful!");
+      if (onUploadSuccess) onUploadSuccess(data.uploads);
+
+    } catch (err) {
+      setLoading(false);
+      console.error("🚨 Upload error:", err);
+      setError(err.message || "Error uploading file");
+      alert("❌ Error uploading file: " + (err.message || ""));
     }
   };
 
   return (
-    <div style={{ marginTop: "20px" }}>
-      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-      <button onClick={handleUpload} disabled={loading} style={{ marginLeft: "10px" }}>
+    <div className="p-4 border rounded-lg shadow-sm bg-white">
+      <input
+        type="file"
+        multiple
+        onChange={handleFileChange}
+        className="block mb-2"
+      />
+      <button
+        onClick={handleUpload}
+        className={`${
+          loading ? "bg-gray-400" : "bg-blue-500 hover:bg-blue-600"
+        } text-white px-4 py-2 ml-2 rounded transition`}
+        disabled={loading}
+      >
         {loading ? "Uploading..." : "Upload"}
       </button>
-      {message && <p>{message}</p>}
+
+      {error && (
+        <p className="text-red-500 text-sm mt-2">
+          ⚠️ {error}
+        </p>
+      )}
     </div>
   );
-}
+};
+
+export default Upload;

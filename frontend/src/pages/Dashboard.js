@@ -38,9 +38,15 @@ function Dashboard({ role }) {
     }
   };
 
+  // ✅ Refresh dashboard when role changes
   useEffect(() => {
     fetchData();
   }, [role]);
+
+  // ✅ Triggered when file uploads successfully
+  const handleUploadSuccess = () => {
+    fetchData(); // refresh uploads after successful upload
+  };
 
   return (
     <div style={{ padding: "20px" }}>
@@ -68,10 +74,11 @@ function Dashboard({ role }) {
         </div>
       )}
 
-      {/* Upload option (for employees/managers/admins) */}
+      {/* Upload section */}
       <div style={{ marginTop: "20px" }}>
         <h3>Upload a File</h3>
-        <Upload />
+        {/* ✅ Now passes callback to refresh dashboard */}
+        <Upload onUploadSuccess={handleUploadSuccess} />
       </div>
 
       {/* Uploaded files list */}
@@ -80,9 +87,108 @@ function Dashboard({ role }) {
       ) : (
         <ul>
           {uploads.map((u) => (
-            <li key={u._id}>
-              {u.userId?.name} → {u.fileName || u.filename} (
-              {new Date(u.createdAt).toLocaleString()})
+            <li
+              key={u._id}
+              style={{
+                marginBottom: "20px",
+                padding: "15px",
+                border: "1px solid #ddd",
+                borderRadius: "6px",
+              }}
+            >
+              <p>
+                <strong>User:</strong> {u.userId?.name || "Unknown"}
+              </p>
+              <p>
+                <strong>File:</strong> {u.fileName || u.filename}
+              </p>
+              <p>
+                <strong>Uploaded At:</strong>{" "}
+                {new Date(u.createdAt).toLocaleString()}
+              </p>
+
+              {/* 📊 Stats */}
+              {u.stats && (
+                <div style={{ marginTop: "10px" }}>
+                  <h4>📊 Stats</h4>
+                  <pre
+                    style={{
+                      background: "#f9f9f9",
+                      padding: "10px",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    {JSON.stringify(u.stats, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* 🤖 AI Insights (structured display) */}
+              {u.aiMeta && (
+                <div style={{ marginTop: "10px" }}>
+                  <h4>🤖 AI Insights</h4>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "10px",
+                      background: "#fafafa",
+                      borderRadius: "6px",
+                      padding: "10px",
+                    }}
+                  >
+                    <div>
+                      <h5>🧠 Summary</h5>
+                      <p>{u.aiMeta.summary || "No summary available."}</p>
+                    </div>
+                    <div>
+                      <h5>🔑 Key Findings</h5>
+                      <ul>
+                        {u.aiMeta.keyFindings?.length
+                          ? u.aiMeta.keyFindings.map((f, i) => (
+                              <li key={i}>{f}</li>
+                            ))
+                          : "None"}
+                      </ul>
+                    </div>
+                    <div>
+                      <h5>⚠️ Anomalies</h5>
+                      <ul>
+                        {u.aiMeta.anomalies?.length
+                          ? u.aiMeta.anomalies.map((a, i) => <li key={i}>{a}</li>)
+                          : "None"}
+                      </ul>
+                    </div>
+                    <div>
+                      <h5>💡 Recommendations</h5>
+                      <ul>
+                        {u.aiMeta.recommendations?.length
+                          ? u.aiMeta.recommendations.map((r, i) => (
+                              <li key={i}>{r}</li>
+                            ))
+                          : "None"}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 🧾 Debug: Raw AI Meta */}
+              {u.aiMeta && (
+                <details style={{ marginTop: "10px" }}>
+                  <summary>See full AI metadata (JSON)</summary>
+                  <pre
+                    style={{
+                      background: "#f4f4f4",
+                      padding: "10px",
+                      borderRadius: "4px",
+                      overflowX: "auto",
+                    }}
+                  >
+                    {JSON.stringify(u.aiMeta, null, 2)}
+                  </pre>
+                </details>
+              )}
             </li>
           ))}
         </ul>
